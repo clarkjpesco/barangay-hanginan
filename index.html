@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Barangay Hanginan - Maasin City Thematic Map</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        min-height: 100vh;
+        color: #ffffff;
+        overflow-x: hidden;
+      }
+
+      .header {
+        background: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(10px);
+        padding: 10px;
+        text-align: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .header h1 {
+        font-size: 1.5em;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      }
+
+      .header p {
+        font-size: 0.8em;
+        opacity: 0.9;
+      }
+
+      .container {
+        display: flex;
+        height: calc(100vh - 50px);
+      }
+
+      .sidebar {
+        width: 350px;
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(15px);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .map-container {
+        flex: 1;
+        position: relative;
+        background: rgba(255, 255, 255, 0.05);
+        width: 800px; /* or any size you want */
+        height: auto;
+      }
+      .map-container img {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      #map-image {
+        width: 100%;
+        display: block;
+      }
+
+      .legend {
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .legend h3 {
+        margin-bottom: 15px;
+        color: #64ffda;
+        font-size: 1.3em;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      .legend-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(5px);
+      }
+
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .danger {
+        background: #ff4444;
+      }
+      .safe {
+        background: #44ff44;
+      }
+      .green {
+        background: #00ff88;
+      }
+      .residential {
+        background: #ffaa44;
+      }
+      .commercial {
+        background: #44aaff;
+      }
+      .water {
+        background: #0099ff;
+      }
+
+      .svg-map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .purok {
+        fill: rgba(100, 255, 218, 0.1);
+        stroke: #64ffda;
+        stroke-width: 2;
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      .purok:hover {
+        fill: rgba(100, 255, 218, 0.3);
+        stroke-width: 3;
+        filter: drop-shadow(0 0 10px #64ffda);
+      }
+
+      .zone-danger {
+        fill: rgba(255, 68, 68, 0.4);
+        stroke: #ff4444;
+      }
+
+      .zone-safe {
+        fill: rgba(68, 255, 68, 0.4);
+        stroke: #44ff44;
+      }
+
+      .zone-green {
+        fill: rgba(0, 255, 136, 0.4);
+        stroke: #00ff88;
+      }
+
+      .building {
+        fill: #ffaa44;
+        stroke: #ff8800;
+        stroke-width: 1;
+      }
+
+      .business {
+        fill: #44aaff;
+        stroke: #0088ff;
+        stroke-width: 1;
+      }
+
+      .water-feature {
+        fill: #0099ff;
+        stroke: #0066cc;
+        stroke-width: 2;
+      }
+
+      .road {
+        stroke: #ffffff;
+        stroke-width: 3;
+        fill: none;
+        opacity: 0.7;
+      }
+
+      .purok-label {
+        font-size: 14px;
+        font-weight: bold;
+        fill: #ffffff;
+        text-anchor: middle;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      }
+
+      .info-panel {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(15px);
+        border-radius: 15px;
+        padding: 20px;
+        min-width: 300px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: none;
+      }
+
+      .info-panel.active {
+        display: block;
+        animation: slideIn 0.3s ease;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 15px;
+      }
+
+      .stat-item {
+        background: rgba(100, 255, 218, 0.1);
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid rgba(100, 255, 218, 0.3);
+      }
+
+      .stat-number {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #64ffda;
+      }
+
+      .stat-label {
+        font-size: 0.9em;
+        opacity: 0.8;
+        margin-top: 5px;
+      }
+
+      .controls {
+        position: absolute;
+        bottom: 30px;
+        right: 20px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .control-btn {
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 14px;
+      }
+
+      .control-btn:hover {
+        background: rgba(100, 255, 218, 0.2);
+        border-color: #64ffda;
+        transform: translateY(-2px);
+      }
+
+      .control-btn.active {
+        background: rgba(100, 255, 218, 0.3);
+        border-color: #64ffda;
+      }
+
+      .summary-stats {
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        margin-top: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .summary-stats h3 {
+        color: #64ffda;
+        margin-bottom: 15px;
+        font-size: 1.3em;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .summary-item:last-child {
+        border-bottom: none;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(100, 255, 218, 0.5);
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 255, 218, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Barangay Hanginan Thematic Map</h1>
+      <p>
+        Maasin City, Southern Leyte - Comprehensive Geographic Information
+        System
+      </p>
+    </div>
+
+    <div class="container">
+      <div class="sidebar">
+        <div class="legend">
+          <h3>🗺️ Zone Classification</h3>
+          <div class="legend-item" data-layer="danger">
+            <div class="legend-color danger"></div>
+            <span>Danger Zone</span>
+          </div>
+          <div class="legend-item" data-layer="safe">
+            <div class="legend-color safe"></div>
+            <span>Safe Zone</span>
+          </div>
+          <div class="legend-item" data-layer="green">
+            <div class="legend-color green"></div>
+            <span>Green Zone</span>
+          </div>
+          <div class="legend-item" data-layer="residential">
+            <div class="legend-color residential"></div>
+            <span>Residential Buildings</span>
+          </div>
+          <div class="legend-item" data-layer="commercial">
+            <div class="legend-color commercial"></div>
+            <span>Business Establishments</span>
+          </div>
+          <div class="legend-item" data-layer="water">
+            <div class="legend-color water"></div>
+            <span>Water Features</span>
+          </div>
+        </div>
+
+        <div class="summary-stats">
+          <h3>📊 Barangay Statistics</h3>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span>Total Population:</span>
+              <strong>2,847</strong>
+            </div>
+            <div class="summary-item">
+              <span>Total Households:</span>
+              <strong>642</strong>
+            </div>
+            <div class="summary-item">
+              <span>Total Families:</span>
+              <strong>598</strong>
+            </div>
+            <div class="summary-item">
+              <span>Professional Workers:</span>
+              <strong>156</strong>
+            </div>
+            <div class="summary-item">
+              <span>Hard Laborers:</span>
+              <strong>423</strong>
+            </div>
+            <div class="summary-item">
+              <span>Total Buildings:</span>
+              <strong>287</strong>
+            </div>
+            <div class="summary-item">
+              <span>Business Establishments:</span>
+              <strong>34</strong>
+            </div>
+            <div class="summary-item">
+              <span>Number of Puroks:</span>
+              <strong>7</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-container">
+        <img src="base-map.png" width="440px" height="611px" />
+        <svg class="svg-map" viewBox="0 0 1000 800">
+          <!-- Buildings -->
+          <rect class="building" x="530" y="150" width="15" height="20" />
+          <rect class="building" x="550" y="145" width="12" height="25" />
+
+          <rect class="building" x="370" y="200" width="15" height="20" />
+          <rect class="building" x="390" y="195" width="12" height="25" />
+
+          <rect class="building" x="320" y="320" width="15" height="20" />
+          <rect class="building" x="300" y="315" width="12" height="25" />
+
+          <rect class="building" x="410" y="350" width="15" height="20" />
+          <rect class="building" x="390" y="345" width="12" height="25" />
+
+          <rect class="building" x="570" y="310" width="15" height="20" />
+          <rect class="building" x="550" y="305" width="12" height="25" />
+
+          <!-- Business establishments -->
+          <rect class="business" x="540" y="180" width="25" height="15" />
+          <rect class="business" x="400" y="220" width="25" height="15" />
+          <rect class="business" x="340" y="320" width="25" height="15" />
+          <rect class="business" x="420" y="370" width="25" height="15" />
+          <rect class="business" x="570" y="300" width="25" height="15" />
+
+          <!-- Zones -->
+          <circle class="zone-danger" cx="610" cy="150" r="40" />
+          <circle class="zone-safe" cx="450" cy="210" r="40" />
+          <circle class="zone-safe" cx="450" cy="350" r="40" />
+
+          <circle class="water-feature" cx="540" cy="120" r="20" />
+          <circle class="water-feature" cx="460" cy="240" r="20" />
+          <circle class="water-feature" cx="320" cy="240" r="20" />
+          <circle class="water-feature" cx="540" cy="260" r="20" />
+          <circle class="water-feature" cx="580" cy="360" r="20" />
+
+          <!-- Purok -->
+          <text class="purok-label" x="570" y="150">PUROK NAGA</text>
+          <circle
+            class="purok"
+            data-purok="1"
+            r="70"
+            cx="570"
+            cy="150"
+            data-purokname="NAGA"
+            data-population="450"
+            data-households="95"
+            data-families="89"
+            data-professionals="28"
+            data-laborers="67"
+            data-buildings="42"
+          />
+          <text class="purok-label" x="425" y="200">PUROK ACACIA</text>
+          <circle
+            class="purok"
+            data-purok="2"
+            r="70"
+            cx="420"
+            cy="200"
+            data-purokname="ACACIA"
+            data-population="450"
+            data-households="95"
+            data-families="89"
+            data-professionals="28"
+            data-laborers="67"
+            data-buildings="42"
+          />
+
+          <text class="purok-label" x="320" y="300">PUROK IPIL-IPIL</text>
+          <circle
+            class="purok"
+            data-purok="3"
+            r="70"
+            cx="320"
+            cy="300"
+            data-purokname="IPIL-IPIL"
+            data-population="450"
+            data-households="95"
+            data-families="89"
+            data-professionals="28"
+            data-laborers="67"
+            data-buildings="42"
+          />
+
+          <text class="purok-label" x="440" y="350">PUROK ROSE</text>
+          <circle
+            class="purok"
+            data-purok="4"
+            r="70"
+            cx="440"
+            cy="350"
+            data-purokname="ROSE"
+            data-population="450"
+            data-households="95"
+            data-families="89"
+            data-professionals="28"
+            data-laborers="67"
+            data-buildings="42"
+          />
+
+          <text class="purok-label" x="570" y="300">PUROK DAISY</text>
+          <circle
+            class="purok"
+            data-purok="5"
+            r="70"
+            cx="570"
+            cy="300"
+            data-purokname="DAISY"
+            data-population="450"
+            data-households="95"
+            data-families="89"
+            data-professionals="28"
+            data-laborers="67"
+            data-buildings="42"
+          />
+        </svg>
+
+        <div class="info-panel" id="infoPanel">
+          <h3 id="purokTitle">Purok Information</h3>
+          <div class="stat-grid" id="statsGrid">
+            <!-- Stats will be populated by JavaScript -->
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="control-btn active" data-view="all">All Layers</button>
+          <button class="control-btn" data-view="population">Population</button>
+          <button class="control-btn" data-view="zones">Zones</button>
+          <button class="control-btn" data-view="buildings">Buildings</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const puroks = document.querySelectorAll(".purok");
+      const infoPanel = document.getElementById("infoPanel");
+      const purokTitle = document.getElementById("purokTitle");
+      const statsGrid = document.getElementById("statsGrid");
+      const controlBtns = document.querySelectorAll(".control-btn");
+      const legendItems = document.querySelectorAll(".legend-item");
+
+      // Purok click handlers
+      puroks.forEach((purok) => {
+        purok.addEventListener("click", () => {
+          const purokNum = purok.dataset.purok;
+          const data = {
+            purokname: purok.dataset.purokname,
+            population: purok.dataset.population,
+            households: purok.dataset.households,
+            families: purok.dataset.families,
+            professionals: purok.dataset.professionals,
+            laborers: purok.dataset.laborers,
+            buildings: purok.dataset.buildings,
+          };
+
+          showPurokInfo(purokNum, data);
+        });
+
+        purok.addEventListener("mouseenter", () => {
+          purok.style.filter = "drop-shadow(0 0 15px #64ffda)";
+        });
+
+        purok.addEventListener("mouseleave", () => {
+          purok.style.filter = "none";
+        });
+      });
+
+      function showPurokInfo(purokNum, data) {
+        purokTitle.textContent = `Purok ${data.purokname} Statistics`;
+
+        statsGrid.innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-number">${data.population}</div>
+                    <div class="stat-label">Population</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.households}</div>
+                    <div class="stat-label">Households</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.families}</div>
+                    <div class="stat-label">Families</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.professionals}</div>
+                    <div class="stat-label">Professionals</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.laborers}</div>
+                    <div class="stat-label">Hard Laborers</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.buildings}</div>
+                    <div class="stat-label">Buildings</div>
+                </div>
+            `;
+
+        infoPanel.classList.add("active");
+      }
+
+      // Control button handlers
+      controlBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          controlBtns.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          const view = btn.dataset.view;
+          toggleView(view);
+        });
+      });
+
+      function toggleView(view) {
+        const dangers = document.querySelectorAll(".zone-danger");
+        const safes = document.querySelectorAll(".zone-safe");
+        const greens = document.querySelectorAll(".zone-green");
+        const buildings = document.querySelectorAll(".building");
+        const businesses = document.querySelectorAll(".business");
+
+        // Reset all visibility
+        [...dangers, ...safes, ...greens, ...buildings, ...businesses].forEach(
+          (el) => {
+            el.style.display = "block";
+          }
+        );
+
+        switch (view) {
+          case "population":
+            [
+              ...dangers,
+              ...safes,
+              ...greens,
+              ...buildings,
+              ...businesses,
+            ].forEach((el) => {
+              el.style.display = "none";
+            });
+            break;
+          case "zones":
+            [...buildings, ...businesses].forEach((el) => {
+              el.style.display = "none";
+            });
+            break;
+          case "buildings":
+            [...dangers, ...safes, ...greens].forEach((el) => {
+              el.style.display = "none";
+            });
+            break;
+        }
+      }
+
+      // Legend item hover effects
+      legendItems.forEach((item) => {
+        item.addEventListener("mouseenter", () => {
+          const layer = item.dataset.layer;
+          highlightLayer(layer, true);
+        });
+
+        item.addEventListener("mouseleave", () => {
+          const layer = item.dataset.layer;
+          highlightLayer(layer, false);
+        });
+      });
+
+      function highlightLayer(layer, highlight) {
+        let elements = [];
+
+        switch (layer) {
+          case "danger":
+            elements = document.querySelectorAll(".zone-danger");
+            break;
+          case "safe":
+            elements = document.querySelectorAll(".zone-safe");
+            break;
+          case "green":
+            elements = document.querySelectorAll(".zone-green");
+            break;
+          case "residential":
+            elements = document.querySelectorAll(".building");
+            break;
+          case "commercial":
+            elements = document.querySelectorAll(".business");
+            break;
+          case "water":
+            elements = document.querySelectorAll(".water-feature");
+            break;
+        }
+
+        elements.forEach((el) => {
+          if (highlight) {
+            el.style.filter = "drop-shadow(0 0 10px currentColor)";
+            el.style.opacity = "1";
+          } else {
+            el.style.filter = "none";
+            el.style.opacity = "0.7";
+          }
+        });
+      }
+
+      // Close info panel when clicking outside
+      document.addEventListener("click", (e) => {
+        if (
+          !infoPanel.contains(e.target) &&
+          !e.target.classList.contains("purok")
+        ) {
+          infoPanel.classList.remove("active");
+        }
+      });
+
+      // Initialize with animation
+      setTimeout(() => {
+        puroks.forEach((purok, index) => {
+          purok.style.animation = `slideIn 0.5s ease ${index * 0.1}s both`;
+        });
+      }, 100);
+    </script>
+  </body>
+</html>
